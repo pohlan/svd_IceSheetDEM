@@ -12,6 +12,7 @@ using Statistics, GeoStats, StatsBase, Distributions, Interpolations, LsqFit, Im
 using Arpack, LinearAlgebra
 using DataStructures: OrderedDict
 import Plots, StatsPlots
+Plots.pyplot()
 
 export parse_commandline
 export archgdal_read, gdalwarp
@@ -53,7 +54,7 @@ end
 
 include("read_in.jl")
 include("gdal_helpers.jl")
-include("reconstruction_routines.jl")
 include("statistics_helpers.jl")
+include("reconstruction_routines.jl")
 
 end # module svd_IceSheetDEM

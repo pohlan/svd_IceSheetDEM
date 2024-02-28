@@ -9,7 +9,7 @@ import GeoFormatTypes as GFT
 using DelimitedFiles, NCDatasets, NetCDF, Glob, DataFrames, CSV, Dates, ZipFile
 using Downloads, Cascadia, Gumbo, HTTP
 using Printf, ProgressMeter
-using Statistics, GeoStats, StatsBase, Distributions, Interpolations, LsqFit, ImageFiltering, ParallelRandomFields.grf2D_CUDA
+using Statistics, GeoStats, StatsBase, Distributions, Interpolations, LsqFit, ImageFiltering, Distances, ParallelRandomFields.grf2D_CUDA
 using Arpack, LinearAlgebra
 using DataStructures: OrderedDict
 import Plots, StatsPlots
@@ -17,7 +17,7 @@ import Plots, StatsPlots
 export parse_commandline
 export archgdal_read, gdalwarp
 export create_aerodem, create_bedmachine_grid, create_imbie_mask, create_atm_grid, create_dhdt_grid
-export solve_lsqfit, create_reconstructed_bedmachine
+export do_reconstruction, create_reconstructed_bedmachine
 export residual_analysis
 
 function parse_commandline(args)
@@ -52,9 +52,9 @@ function parse_commandline(args)
     return parse_args(args,s)
 end
 
-include("read_in.jl")
 include("gdal_helpers.jl")
 include("reconstruction_routines.jl")
 include("statistics_helpers.jl")
+include("model_selection.jl")
 
 end # module svd_IceSheetDEM

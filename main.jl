@@ -37,7 +37,7 @@ if !isfile(shp_file)
 end
 
 # 4.) check if aerodem is available at the right grid, if not warp from available one or download/create from scratch
-aerodem_g150, obs_file = create_aerodem(;gr, shp_file, bedmachine_path)
+aerodem_g150, obs_file, rm_gr_file = create_aerodem(;gr, shp_file, bedmachine_path)
 
 # 5.) get a netcdf mask from the imbie shp file
 imbie_mask_file = create_imbie_mask(;gr, shp_file, sample_path=aerodem_g150)
@@ -50,7 +50,7 @@ imbie_mask_file = create_imbie_mask(;gr, shp_file, sample_path=aerodem_g150)
 r           = parsed_args["r"]
 do_figures  = parsed_args["do_figures"]
 use_arpack  = parsed_args["use_arpack"]
-rec_file    = solve_lsqfit(F, λ, r, gr, imbie_mask_file, bedmachine_file, training_data_files, obs_file, do_figures, use_arpack)
+rec_file    = solve_lsqfit(F, λ, r, gr, imbie_mask_file, bedmachine_file, training_data_files, obs_file, rm_file, do_figures, use_arpack)
 
 # 5.) calculate the floating mask and create nc file according to the bedmachine template
 create_reconstructed_bedmachine(rec_file, bedmachine_file)  # ToDo --> after rf gneration??

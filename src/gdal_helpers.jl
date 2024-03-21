@@ -11,7 +11,7 @@ function get_options(;gr, cut_shp = "", srcnodata="", dstnodata="", x_min = - 67
                                                                     y_max = - 635600)
     options = ["-overwrite",
                "-t_srs", "EPSG:3413",
-               "-r", "average",
+               "-r", "bilinear",
                "-co", "FORMAT=NC4",
                "-co", "COMPRESS=DEFLATE",
                "-co", "ZLEVEL=2",
@@ -51,7 +51,7 @@ function gdalwarp(path::String; gr::Real, cut_shp="", srcnodata="", dstnodata=""
 end
 function gdalwarp(path::Vector{String}; gr::Real, cut_shp="", srcnodata="", dstnodata="", kwargs...)
     source = AG.read.(path)
-    ds = AG.gdalwarp(source, get_options(;gr, srcnodata)) do warped1
+    ds = AG.gdalwarp(source, get_options(;gr, srcnodata, dstnodata)) do warped1
         if !isempty(cut_shp)
             AG.gdalwarp([warped1], get_options(;gr, cut_shp, srcnodata, dstnodata); kwargs...) do warped2
                 band = AG.getband(warped2, 1)
@@ -87,7 +87,7 @@ end
 """
 function save_netcdf(dest::String, spatial_template_file::String, layers::Vector{T}, layernames::Vector{String}, attributes::Dict{String, Dict{String, Any}})  where T <: AbstractArray
     template  = NCDataset(spatial_template_file)
-    crs_names = ["mapping", "polar_stereographic", "crs"]
+    crs_names = ["mapping", "polar_stereographic", "crs", "spatial_ref"]
     m    = crs_names[findfirst(in.(crs_names, (keys(template),)))]
     crs  = template[m]
     tx   = template["x"]
@@ -301,7 +301,7 @@ function create_aerodem(;gr, shp_file, bedmachine_path, kw="")
     gdalwarp(aerodem_g150_file; gr, srcnodata=dstnodata, dest=aerodem_gr_file)
     # gdalwarp(rm_g150_file; gr, srcnodata=dstnodata, dest=rm_gr_file)
 
-    return aerodem_g150_file, aerodem_gr_file  #, rm_gr_file
+    return aerodem_g150_file, aerodem_gr_file, rm_gr_file
 end
 
 function create_imbie_mask(;gr, shp_file, sample_path)

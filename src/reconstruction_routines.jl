@@ -1,6 +1,7 @@
-function prepare_problem(obs_file::String, imbie_mask::String, bedm_file::String, model_files::Vector{String}, F::DataType)
+function prepare_problem(obs_file::String, rm_file::String, imbie_mask::String, bedm_file::String, model_files::Vector{String}, F::DataType)
     # load observations
     obs = ncread(obs_file, "Band1")
+    rm  = ncread(rm_file, "Band1")
 
     # load masks
     I_no_ocean, I_obs = get_indices(obs, imbie_mask, bedm_file)
@@ -8,10 +9,11 @@ function prepare_problem(obs_file::String, imbie_mask::String, bedm_file::String
     # load model data
     Data_ice, nx, ny = read_model_data(;F,model_files,I_no_ocean)
     obs_flat_I = F.(obs[I_no_ocean][I_obs])
-    return  Data_ice, obs_flat_I, I_no_ocean, I_obs, nx, ny
+    rm_flat_I  = F.(rm[I_no_ocean][I_obs])
+    return  Data_ice, obs_flat_I, rm_flat_I, I_no_ocean, I_obs, nx, ny
 end
 
-function solve_problem(Data_ice::Matrix{T}, obs_flat_I::Vector{T}, I_no_ocean::Vector{Int}, I_obs::Vector{Int}, nx::Int, ny::Int, r::Int, λ::Real, F::DataType, use_arpack::Bool) where T <: Real
+function solve_problem(Data_ice::Matrix{T}, obs_flat_I::Vector{T}, rm_flat_I::Vector, I_no_ocean::Vector{Int}, I_obs::Vector{Int}, nx::Int, ny::Int, r::Int, λ::Real, F::DataType, use_arpack::Bool) where T <: Real
     # centering model data
     Data_mean  = mean(Data_ice, dims=2)
     Data_ice  .= Data_ice .- Data_mean
@@ -33,11 +35,19 @@ function solve_problem(Data_ice::Matrix{T}, obs_flat_I::Vector{T}, I_no_ocean::V
 
     # solve the lsqfit problem
     println("Solving the least squares problem..")
-    UΣ            = U*diagm(Σ)
-    U_A, Σ_A, V_A = svd(UΣ[I_obs,:])
-    D             = transpose(diagm(Σ_A))*diagm(Σ_A) + λ*I
-    v_rec         = V_A * D^(-1) * transpose(diagm(Σ_A)) * transpose(U_A) * x_data
-    x_rec         = U*diagm(Σ)*v_rec .+ Data_mean
+    A             = (U*diagm(Σ))[I_obs,:]
+    if rank(A) != size(A,2) @warn "Matrix A has to be of full rank to be invertible." end # has to be full rank to be an invertible matrix
+
+    sc = 100000 # how much larger should the highest value be compared to the smallest one
+    rm_flat_I .= rm_flat_I .- minimum(rm_flat_I)
+    rm_scaled = 1 .+ rm_flat_I .* (sc-1)/maximum(rm_flat_I)
+    # assemble weight matrix
+    W  = Diagonal(rm_scaled)
+    # v_rec = (transpose(A)*W*A+λ*I)^(-1) * transpose(A)*W*x_data  # direct inversion of A
+    U_A, Σ_A, V_A = svd(A)
+    D             = transpose(diagm(Σ_A))*W*diagm(Σ_A) + λ*I
+    v_rec         = V_A * D^(-1) * transpose(diagm(Σ_A)) * transpose(U_A) * W * x_data
+    x_rec         = (U*Diagonal(Σ)*v_rec).+ Data_mean
 
     # calculate error and print
     dif                     = zeros(F, nx,ny)
@@ -48,9 +58,9 @@ function solve_problem(Data_ice::Matrix{T}, obs_flat_I::Vector{T}, I_no_ocean::V
     return x_rec, err_mean, dif
 end
 
-function solve_lsqfit(F::DataType, λ::Real, r::Int, gr::Int, imbie_mask::String, bedm_file::String, model_files::Vector{String}, obs_file::String, do_figures=false, use_arpack=false)
-    Data_ice, obs_flat_I, I_no_ocean, I_obs, nx, ny = prepare_problem(obs_file, imbie_mask, bedm_file, model_files, F)
-    x_rec, err_mean, dif                            = solve_problem(Data_ice, obs_flat_I, I_no_ocean, I_obs, nx, ny, r, λ, F, use_arpack)
+function solve_lsqfit(F::DataType, λ::Real, r::Int, gr::Int, imbie_mask::String, bedm_file::String, model_files::Vector{String}, obs_file::String, rm_file::String, do_figures=false, use_arpack=false)
+    Data_ice, obs_flat_I, rm_flat_I, I_no_ocean, I_obs, nx, ny = prepare_problem(obs_file, rm_file, imbie_mask, bedm_file, model_files, F)
+    x_rec, err_mean, dif                            = solve_problem(Data_ice, obs_flat_I, rm_flat_I, I_no_ocean, I_obs, nx, ny, r, λ, F, use_arpack)
 
     # retrieve matrix of reconstructed DEM
     dem_rec             = zeros(F, nx,ny)
